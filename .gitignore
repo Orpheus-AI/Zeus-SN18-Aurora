@@ -1,0 +1,6 @@
+*.env
+data/*
+!data/era5/
+data/era5/*
+!data/era5/static.nc
+__pycache__/
