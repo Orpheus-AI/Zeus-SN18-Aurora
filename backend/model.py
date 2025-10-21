@@ -150,4 +150,5 @@ class Predictor:
         interpolator = PchipInterpolator(t_original, data, axis=0)
 
         data_hourly = interpolator(t_new)
+        # remove first datapoint (only there for interpolation)
         return data_hourly[1:]

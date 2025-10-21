@@ -38,7 +38,7 @@ class AuroraAPI:
         self.app = FastAPI()
         self.app.post('/query', dependencies=[Depends(self.verify)])(self.query)
         # run FastAPI in a separate thread.
-        threading.Thread(target=lambda: uvicorn.run(self.app, host="0.0.0.0", port=port, log_level="info")).start()
+        threading.Thread(target=lambda: uvicorn.run(self.app, host="0.0.0.0", port=port, log_level="INFO")).start()
         threading.Thread(target=self.timer_loop, daemon=True).start()
         self.worker() # block main thread for GPU
 
