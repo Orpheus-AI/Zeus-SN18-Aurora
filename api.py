@@ -2,8 +2,9 @@ import threading
 import time
 import argparse
 import traceback
-import asyncio
 import logging
+from pathlib import Path
+logging.basicConfig(level=logging.INFO)
 
 import uvicorn
 import numpy as np
@@ -16,13 +17,12 @@ from backend.prediction import Prediction
 from backend.utils import slice_bbox
 
 class AuroraAPI:
-    PRED_SAFE_PATH = "~/.cache/aurora/prediction.npz"
 
     def __init__(
             self, 
             port,
             api_key: str,
-            steps = 48, # 5 past + 7 future days, 12 * 4 = 48
+            steps = 49, # 5 past + 7 future days, 12 * 4 = 48 and 1 extra for hermite interpolation
         ):
         
         self.data_loader = CDSLoader(cache_dir="data/era5/")
@@ -30,15 +30,19 @@ class AuroraAPI:
         self.steps = steps
         self.api_key = api_key
 
-        self.prediction = Prediction.from_file(self.PRED_SAFE_PATH)
+        self.pred_safe_path = Path.home() / ".cache" / "aurora" / f"prediction_steps{steps}.npz"
+        self.pred_safe_path.parent.mkdir(parents=True, exist_ok=True)
+
+        self.prediction = Prediction.from_file(self.pred_safe_path)
         self.prediction_needed = threading.Event()
+
         if self.data_loader.update_and_status() or self.prediction is None:
             self.prediction_needed.set()
 
         self.app = FastAPI()
         self.app.post('/query', dependencies=[Depends(self.verify)])(self.query)
         # run FastAPI in a separate thread.
-        threading.Thread(target=lambda: uvicorn.run(self.app, host="0.0.0.0", port=port, log_level="INFO")).start()
+        threading.Thread(target=lambda: uvicorn.run(self.app, host="0.0.0.0", port=port, log_level="info")).start()
         threading.Thread(target=self.timer_loop, daemon=True).start()
         self.worker() # block main thread for GPU
 
@@ -46,9 +50,12 @@ class AuroraAPI:
         while True:
             self.prediction_needed.wait()
             self.data_loader.update_and_status()
-            logging.warning(f"{pd.Timestamp.now()} Running new prediction with steps {self.steps}...")
+
+            logging.warning(f"[{pd.Timestamp.now()}] Running new prediction with steps {self.steps}...")
             self.prediction = self.run_prediction()
-            self.prediction.to_file(self.PRED_SAFE_PATH)
+            self.prediction.to_file(self.pred_safe_path)
+            logging.warning(f"[{pd.Timestamp.now()}] Prediction done.")
+
             self.prediction_needed.clear()
            
 
@@ -90,8 +97,9 @@ class AuroraAPI:
             end_time = pd.Timestamp(json["end_time"])
 
             variable = json["variable"]
-            assert variable in self.prediction.__dict__, f"Only {self.prediction.__dict__.keys()} are valid variables."
-            data = getattr(self.prediction, variable)
+            data = self.prediction.get(variable)
+
+            assert start_time <= end_time, "start_time must be before or equal to end_time."
 
             # include both start and end time
             hours = int((end_time - start_time).total_seconds()) // 3600 + 1
@@ -99,7 +107,7 @@ class AuroraAPI:
 
             # one hour more than data is first stored prediction
             start_idx = int((start_time - self.data_loader.surf_vars_ds.valid_time.max().values).total_seconds()) // 3600 - 1
-            assert start_idx >= 0 and (start_idx + hours) < data.shape[0], "Start time is too early or late."
+            assert start_idx >= 0 and (start_idx + hours) < data.shape[0], "Start or end time is too early or late."
 
             result: np.ndarray = slice_bbox(
                 data[start_idx:start_idx + hours],
@@ -111,7 +119,6 @@ class AuroraAPI:
 
         except Exception:
             exc_string = traceback.format_exc()
-            logging.warning("Error in request: \n" + exc_string)
             raise HTTPException(status_code=500, detail=exc_string)
 
 

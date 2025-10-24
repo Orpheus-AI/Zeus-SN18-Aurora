@@ -8,10 +8,7 @@ import numpy as np
 @dataclass
 class Prediction(object):
 
-    temperature: np.ndarray  # Temperature data at 100m height
-    u_wind_100m: np.ndarray   # U component of wind at 100m height
-    v_wind_100m: np.ndarray   # V component of wind at
-
+    temperature: np.ndarray  # Temperature data at 2m height
 
     def to_file(self, filename):
         """
@@ -19,8 +16,6 @@ class Prediction(object):
         """
         np.savez(os.path.expanduser(filename),
             temperature=self.temperature,
-            u_wind_100m=self.u_wind_100m,
-            v_wind_100m=self.v_wind_100m
         )
     
     def from_file(filename) -> Optional['Prediction']:
@@ -31,8 +26,14 @@ class Prediction(object):
             data = np.load(os.path.expanduser(filename))
             return Prediction(
                 temperature=data['temperature'],
-                u_wind_100m=data['u_wind_100m'],
-                v_wind_100m=data['v_wind_100m']
             )
         except FileNotFoundError:
             return None
+
+    def get(self, variable: str) -> Optional[np.ndarray]:
+        """
+        Get a specific variable from the prediction.
+        """
+        if variable == "2m_temperature":
+            return self.temperature
+        raise NotImplementedError(f"Variable {variable} not implemented.")

@@ -29,3 +29,24 @@ def slice_bbox(
     sl[lat_dim + 1] = slice(lon_start_idx, lon_end_idx + 1)
 
     return matrix[tuple(sl)]
+
+def get_grid(
+    lat_start: float,
+    lat_end: float,
+    lon_start: float,
+    lon_end: float,
+    fidelity: int = 4,
+) -> torch.Tensor:
+    """
+    Get a grid of lat-lon points in the given bounding box.
+    """
+    return torch.stack(
+        torch.meshgrid(
+            *[
+                torch.linspace(start, end, int((end - start) * fidelity) + 1)
+                for start, end in [(lat_start, lat_end), (lon_start, lon_end)]
+            ],
+            indexing="ij",
+        ),
+        dim=-1,
+    )  # (lat, lon, 2)

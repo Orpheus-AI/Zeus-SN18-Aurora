@@ -69,7 +69,7 @@ class CDSLoader():
         dataset = xr.open_mfdataset(
             [root / "0.nc", root / "1.nc"], 
             combine="by_coords", 
-            engine='h5netcdf',
+            engine='netcdf4',
             compat="no_conflicts",
         )
         dataset = dataset.sortby("valid_time")
