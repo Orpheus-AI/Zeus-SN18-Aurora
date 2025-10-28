@@ -56,10 +56,13 @@ class Predictor:
     def _post_process_generic(self, data, add_first_row=True):
         # aurora post-process
         # Make latitude go from -87.5 to 90.0 instead of decreasing order
-        # duplicate the first row for a -90.0 prediction
+        # duplicate the first row for a -90.0 prediction        
         data = data.squeeze().flip(dims=(-2,))
         if add_first_row:
             data = torch.cat((data[0].unsqueeze(0), data))
+        # convert longitude 0..360 -> -180..180 by rolling half the width
+        shift = data.shape[-1] // 2
+        data = torch.roll(data, shifts=shift, dims=-1)
         return data
 
     def predict(self, batch: Batch, steps: int) -> Prediction:
