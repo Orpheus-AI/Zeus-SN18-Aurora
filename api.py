@@ -41,6 +41,7 @@ class AuroraAPI:
 
         self.app = FastAPI()
         self.app.post('/query', dependencies=[Depends(self.verify)])(self.query)
+        self.app.get('/refresh', dependencies=[Depends(self.verify)])(self.refresh)
         # run FastAPI in a separate thread.
         threading.Thread(target=lambda: uvicorn.run(self.app, host="0.0.0.0", port=port, log_level="info")).start()
         threading.Thread(target=self.timer_loop, daemon=True).start()
@@ -61,9 +62,9 @@ class AuroraAPI:
 
     def timer_loop(self):
         while True:
-            next_stamp = self.data_loader.last_six_hour_floored_stamp() + pd.Timedelta(hours=6)
-            seconds = (pd.Timestamp.now() - next_stamp).total_seconds() + 1
-            
+            now = pd.Timestamp.now(tz="UTC")
+            next_stamp = (now + pd.Timedelta(seconds=1)).ceil("6h")
+            seconds = (next_stamp - now).total_seconds()
             time.sleep(seconds)
             self.prediction_needed.set()
 
@@ -120,6 +121,13 @@ class AuroraAPI:
         except Exception:
             exc_string = traceback.format_exc()
             raise HTTPException(status_code=500, detail=exc_string)
+
+    async def refresh(self):
+        """
+        Trigger an immediate data check and prediction refresh.
+        """
+        self.prediction_needed.set()
+        return {"status": "queued"}
 
 
 # Create the API instance and run the server
