@@ -1,4 +1,5 @@
 from pathlib import Path
+import math
 import os
 
 import pandas as pd
@@ -45,26 +46,31 @@ class CDSLoader():
 
 
     def update_and_status(self) -> bool:
-        # exact integer number of 6h cycles behind
-        delta = self.last_six_hour_floored_stamp() - pd.Timestamp(self.surf_vars_ds.valid_time.max().values)
-        cycles_behind = int(delta // pd.Timedelta(hours=6))
+        latest_local = pd.Timestamp(self.surf_vars_ds.valid_time.max().values)
+        target_time = self.last_six_hour_floored_stamp()
+        delta = target_time - latest_local
 
-        if cycles_behind >= 2:
-            print("Data is too old. Re-downloading the two most recent days.")
-            self.download_two_most_recent(self.surf_root, self.atmos_root)
-
-        elif cycles_behind >= 1:
-            print("We are 6 hours behind. Updating data.")
-            os.remove(self.surf_root / "0.nc")
-            os.remove(self.atmos_root / "0.nc")
-            os.rename(self.surf_root / "1.nc", self.surf_root / "0.nc")
-            os.rename(self.atmos_root / "1.nc", self.atmos_root / "0.nc")
-            self.download_date(self.last_six_hour_floored_stamp(), self.surf_root / "1.nc", self.atmos_root / "1.nc")
-
-        else:
+        if delta <= pd.Timedelta(0):
             return False
 
+        six_hours = pd.Timedelta(hours=6)
+        cycles_behind = max(1, math.ceil(delta / six_hours))
+        lag_hours = float(delta / pd.Timedelta(hours=1))
+
+        if cycles_behind >= 2:
+            print(f"Data is {lag_hours:.1f} hours behind. Re-downloading the two most recent steps.")
+        else:
+            print(f"Data is {lag_hours:.1f} hours behind. Refreshing the most recent step.")
+
+        previous_latest = latest_local
+        self.download_two_most_recent(self.surf_root, self.atmos_root)
         self.load_dataset()
+
+        new_latest = pd.Timestamp(self.surf_vars_ds.valid_time.max().values)
+        if new_latest <= previous_latest:
+            print(f"No new ERA5 data available yet (latest timestamp still {previous_latest}).")
+            return False
+
         return True
         
     def load_sharded_dataset(self, root: Path):
