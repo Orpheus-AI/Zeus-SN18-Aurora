@@ -20,5 +20,5 @@ It will take a while before the data is downloaded and the predictions are compl
 ### api.py
 
 The API fetches the latest available ERA5 data and uses it to generate predictions. 
-These predictions are cached such that it can be queried with the \query endpoint.
+These predictions are cached such that it can be queried with the /query endpoint.
 The data is refreshed every 6 hours with the latest ERA5 data to generate new predictions.  
