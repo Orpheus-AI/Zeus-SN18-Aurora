@@ -51,7 +51,6 @@ class AuroraAPI:
 
         self.app = FastAPI()
         self.app.post('/query', dependencies=[Depends(self.verify)])(self.query)
-        self.app.get('/refresh', dependencies=[Depends(self.verify)])(self.refresh)
         # run FastAPI in a separate thread.
         threading.Thread(target=lambda: uvicorn.run(self.app, host="0.0.0.0", port=port, log_level="info")).start()
         threading.Thread(target=self.timer_loop, daemon=True).start()
@@ -171,13 +170,6 @@ class AuroraAPI:
         except Exception:
             exc_string = traceback.format_exc()
             raise HTTPException(status_code=500, detail=exc_string)
-
-    async def refresh(self):
-        """
-        Trigger an immediate data check and prediction refresh.
-        """
-        self.prediction_needed.set()
-        return {"status": "queued"}
 
 
 # Create the API instance and run the server
