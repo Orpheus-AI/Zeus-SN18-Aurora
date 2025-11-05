@@ -35,9 +35,19 @@ class AuroraAPI:
 
         self.prediction = Prediction.from_file(self.pred_safe_path)
         self.prediction_needed = threading.Event()
+        self.retry_interval_seconds = 600
+        self._retry_timer = None
 
-        if self.data_loader.update_and_status() or self.prediction is None:
+        try:
+            initial_update = self.data_loader.update_and_status()
+        except Exception:
+            logging.exception("Initial ERA5 refresh failed; will retry shortly.")
+            initial_update = False
+
+        if initial_update or self.prediction is None:
             self.prediction_needed.set()
+        else:
+            self._schedule_retry()
 
         self.app = FastAPI()
         self.app.post('/query', dependencies=[Depends(self.verify)])(self.query)
@@ -46,30 +56,70 @@ class AuroraAPI:
         threading.Thread(target=self.timer_loop, daemon=True).start()
         self.worker() # block main thread for GPU
 
+    def _schedule_retry(self, delay_seconds=None):
+        delay = delay_seconds or self.retry_interval_seconds
+
+        if self._retry_timer and self._retry_timer.is_alive():
+            return
+
+        def trigger():
+            self._retry_timer = None
+            self.prediction_needed.set()
+
+        timer = threading.Timer(delay, trigger)
+        timer.daemon = True
+        self._retry_timer = timer
+        timer.start()
+
+    def _cancel_retry_timer(self):
+        if self._retry_timer and self._retry_timer.is_alive():
+            self._retry_timer.cancel()
+        self._retry_timer = None
+
     def worker(self):
         while True:
             self.prediction_needed.wait()
-            self.data_loader.update_and_status()
-
-            logging.warning(f"[{pd.Timestamp.now()}] Running new prediction with steps {self.steps}...")
-            self.prediction = self.run_prediction()
-            self.prediction.to_file(self.pred_safe_path)
-            logging.warning(f"[{pd.Timestamp.now()}] Prediction done.")
-
             self.prediction_needed.clear()
+            self._cancel_retry_timer()
+
+            try:
+                updated = self.data_loader.update_and_status()
+            except Exception:
+                logging.exception("ERA5 refresh failed.")
+                self._schedule_retry()
+                continue
+
+            force_prediction = self.prediction is None
+            if not updated and not force_prediction:
+                latest_time = pd.Timestamp(self.data_loader.surf_vars_ds.valid_time.max().values)
+                logging.info(
+                    f"[{pd.Timestamp.now()}] ERA5 data already up to date (latest {latest_time}). "
+                    f"Retrying in {self.retry_interval_seconds // 60} minutes."
+                )
+                self._schedule_retry()
+                continue
+
+            try:
+                logging.warning(f"[{pd.Timestamp.now()}] Running new prediction with steps {self.steps}...")
+                self.prediction = self.run_prediction()
+                self.prediction.to_file(self.pred_safe_path)
+                logging.warning(f"[{pd.Timestamp.now()}] Prediction done.")
+            except Exception:
+                logging.exception("Prediction run failed.")
+                self._schedule_retry()
+                continue
            
 
     def timer_loop(self):
         while True:
-            next_stamp = self.data_loader.last_six_hour_floored_stamp() + pd.Timedelta(hours=6)
-            seconds = (pd.Timestamp.now() - next_stamp).total_seconds() + 1
-            
+            now = pd.Timestamp.now(tz="UTC")
+            next_stamp = (now + pd.Timedelta(seconds=1)).ceil("6h")
+            seconds = (next_stamp - now).total_seconds()
             time.sleep(seconds)
             self.prediction_needed.set()
 
     
     def run_prediction(self) -> Prediction:
-        self.data_loader.update_and_status()
         batch = self.model.construct_batch(
             static_vars=self.data_loader.static_vars,
             surf_vars_ds=self.data_loader.surf_vars_ds,

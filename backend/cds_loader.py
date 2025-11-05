@@ -1,4 +1,5 @@
 from pathlib import Path
+import math
 import os
 
 import pandas as pd
@@ -45,24 +46,31 @@ class CDSLoader():
 
 
     def update_and_status(self) -> bool:
-        hours_age = (self.last_six_hour_floored_stamp() - self.surf_vars_ds.valid_time.max().values).total_seconds() / 3600
-        if hours_age == 6:
-            print("We are 6 hours behind. Updating data.")
-            os.remove(self.surf_root / "0.nc")
-            os.remove(self.atmos_root / "0.nc")
-            os.rename(self.surf_root / "1.nc", self.surf_root / "0.nc")
-            os.rename(self.atmos_root / "1.nc", self.atmos_root / "0.nc")
-            self.download_date(
-                self.last_six_hour_floored_stamp(), 
-                self.surf_root / "1.nc", 
-                self.atmos_root / "1.nc"
-            )
-        elif hours_age > 6:
-            print(f"Data is too old. Re-downloading the two most recent days.")
-            self.download_two_most_recent(self.surf_root, self.atmos_root)
-        else:
+        latest_local = pd.Timestamp(self.surf_vars_ds.valid_time.max().values)
+        target_time = self.last_six_hour_floored_stamp()
+        delta = target_time - latest_local
+
+        if delta <= pd.Timedelta(0):
             return False
+
+        six_hours = pd.Timedelta(hours=6)
+        cycles_behind = max(1, math.ceil(delta / six_hours))
+        lag_hours = float(delta / pd.Timedelta(hours=1))
+
+        if cycles_behind >= 2:
+            print(f"Data is {lag_hours:.1f} hours behind. Re-downloading the two most recent steps.")
+        else:
+            print(f"Data is {lag_hours:.1f} hours behind. Refreshing the most recent step.")
+
+        previous_latest = latest_local
+        self.download_two_most_recent(self.surf_root, self.atmos_root)
         self.load_dataset()
+
+        new_latest = pd.Timestamp(self.surf_vars_ds.valid_time.max().values)
+        if new_latest <= previous_latest:
+            print(f"No new ERA5 data available yet (latest timestamp still {previous_latest}).")
+            return False
+
         return True
         
     def load_sharded_dataset(self, root: Path):
@@ -126,8 +134,10 @@ class CDSLoader():
         )
 
     def last_six_hour_floored_stamp(self):
-        last_era5 = pd.Timestamp.now().floor("h") - pd.Timedelta(days=5)
-        return last_era5 - pd.Timedelta(hours=last_era5.hour % 6)
+        now_utc = pd.Timestamp.now(tz="UTC").floor("h")
+        last_era5 = now_utc - pd.Timedelta(days=5)
+        base_utc = last_era5 - pd.Timedelta(hours=last_era5.hour % 6)  # 00/06/12/18 UTC
+        return base_utc.tz_localize(None)
 
     def download_date(self, date, surf_file, atmos_file):
         print(f"Downloading data for {date}")
