@@ -4,7 +4,7 @@ We provide an implementation of Aurora as FastAPI that fetches the latest ERA5 d
 
 ## Information about Aurora
 
-- Aurora is a foundational weather model developed by Microsoft (To read more: [https://microsoft.github.io/aurora/intro.html]).
+- Aurora is a foundational weather model developed by Microsoft ([To read more](https://microsoft.github.io/aurora/intro.html)).
 - The model is initialized with the latest ERA5 data (surface and atmospheric variables reflecting the current state of the atmosphere) to predict the following X steps of the atmosphere.
 - Each prediction step is 6 hours. Therefore, we interpolate between two adjacent predictions to get hourly predictions.
 - We use the aurora-0.25-pretrained.ckpt for ERA5.
