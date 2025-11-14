@@ -1,5 +1,7 @@
 <p align="center">
+  <a href="https://www.zeussubnet.com/">
   <img src="https://github.com/Orpheus-AI/Zeus/blob/main/static/zeus-icon.png" alt="Zeus Logo" width="150"/>
+</a>
 </p>
 
 # Zeus (SN18) Aurora API
