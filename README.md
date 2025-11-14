@@ -33,7 +33,7 @@ We provide an implementation of Aurora as FastAPI that fetches the latest ERA5 d
 ### Steps
 1. `cd /root/SN18-Aurora`
 2. Run `bash install.sh`
-3. Update `settings.env` with your CDS credentials (`CDS_API_KEY=<uid:secret>`)
+3. Update `settings.env` with your CDS credentials (`CDS_API_KEY=<your key here>`)
 4. Run `bash install.sh` again to finish dependency installation and CDS login
 5. Start the API with pm2:
    ```bash
@@ -43,7 +43,7 @@ We provide an implementation of Aurora as FastAPI that fetches the latest ERA5 d
 > The first boot performs the ERA5 downloads and the Aurora prediction rollout steps. This preparation step takes 10-15 min the first time. 
 
 ### settings.env
-- `CDS_API_KEY` – Copernicus API token in the format `user_id:api_key`
+- `CDS_API_KEY` – Copernicus API token.
 
 The installer writes the key to `~/.cdsapirc` so `cdsapi` can authenticate. Re-run `install.sh` whenever the key changes.
 
