@@ -31,13 +31,13 @@ We provide an implementation of Aurora as FastAPI that fetches the latest ERA5 d
 - Copernicus Data Store (CDS) account **with API key** (setup instructions in [Zeus/validating.md](https://github.com/Orpheus-AI/Zeus/blob/main/docs/Validating.md#2-ecmwf))
 
 ### Steps
-1. `cd /root/SN18-Aurora`
+1. `cd /root/Zeus-SN18-Aurora`
 2. Run `bash install.sh`
 3. Update `settings.env` with your CDS credentials (`CDS_API_KEY=<your key here>`)
 4. Run `bash install.sh` again to finish dependency installation and CDS login
 5. Start the API with pm2:
    ```bash
-   pm2 start /root/SN18-Aurora/api.py --name "aurora-api" --interpreter python3 --no-autorestart -- -p 17200 
+   pm2 start /root/Zeus-SN18-Aurora/api.py --name "aurora-api" --interpreter python3 --no-autorestart -- -p 17200 
    ```
 
 > The first boot performs the ERA5 downloads and the Aurora prediction rollout steps. This preparation step takes 10-15 min the first time. 
@@ -90,13 +90,13 @@ We predict a bounding box (i.e. a slice of the earth)
 
 ## Example: `notebook_examples/test_api.ipynb`
 - The notebook shows how to:
-  - construct a query payload with python
+  - Construct a query payload with python
   - Authenticating with the API
   - Comparing Aurora output against Open-Meteo data
 
 ## Troubleshooting
 - `503 Prediction is not ready yet` – Wait for the initial download/prediction cycle to finish.
-- `Unauthorized` responses – Ensure the `Authorization` header matches the key
+- `Unauthorized` responses – Ensure the `Authorization` header matches the key.
 
 ## Credits
 
