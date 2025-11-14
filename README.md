@@ -1,4 +1,8 @@
-# SN18 Aurora API
+<p align="center">
+  <img src="https://github.com/Orpheus-AI/Zeus/blob/main/static/zeus-icon.png" alt="Zeus Logo" width="150"/>
+</p>
+
+# Zeus (SN18) Aurora API
 
 We provide an implementation of Aurora as FastAPI that fetches the latest ERA5 data and generates global forecasts to provide hourly 2m temperature predictions. This repository contains everything required to download the inputs from Copernicus, run the inference on a GPU, cache Aurora's predictions and serve them to downstream applications.
 
